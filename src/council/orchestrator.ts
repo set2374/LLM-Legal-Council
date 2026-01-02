@@ -137,6 +137,7 @@ export class LegalCouncilOrchestrator {
   private onProgress?: ProgressCallback;
   private skills: LoadedSkills;
   private auditCollector?: AuditCollector;
+  private sessionId?: string;  // Current deliberation session ID
 
   constructor(
     openRouter: OpenRouterClient, 
@@ -400,6 +401,7 @@ PHASE 3: VERIFICATION & SYNTHESIS
   async deliberate(query: CouncilQuery): Promise<CouncilDeliberation> {
     const startTime = Date.now();
     const sessionId = crypto.randomUUID();
+    this.sessionId = sessionId;  // Store for use in stage methods
     
     // Initialize usage tracking
     this.usageTracker = new UsageTracker(sessionId);
@@ -779,7 +781,7 @@ Apply the attached legal reasoning skills. Be direct. Disagreement with other an
             { role: 'user', content: userPrompt }
           ],
           stage1JsonSchema,
-          { sessionId, label: member.sessionLabel! }
+          { sessionId: this.sessionId!, label: member.sessionLabel! }
         );
 
         // Parse the final response content
