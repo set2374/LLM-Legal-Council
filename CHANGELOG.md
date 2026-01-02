@@ -1,5 +1,59 @@
 # Changelog
 
+## [0.6.0] - 2026-01-02
+
+### Breaking Changes
+- **Tool API updated** - `ToolDefinition` now requires `jsonSchema` property (auto-generated from Zod)
+- **RAG worker requires authentication** - All endpoints now require Bearer token
+
+### Added (Architecture)
+- **Stage-specific skill loading** - Stage 1 and Stage 2 now both receive full analysis skills with task-appropriate framing; Stage 3 receives chairman-synthesis skill only
+- **Chairman Synthesis skill** (`skills/chairman-synthesis.md`) - Constrains Stage 3 to reporting/synthesis, prevents chairman from overriding council conclusions
+- **Zod to JSON Schema converter** (`tools/definitions.ts`) - Fixes P0.3a; tool parameters now properly converted for OpenRouter
+
+### Added (Tools - Real Implementations)
+- **`search_project_files`** - Calls Cloudflare RAG worker with authentication (Priority 1)
+- **`search_case_law`** - Calls CourtListener API with jurisdiction filtering (Priority 2)
+- **`search_statutes`** - Calls Cornell LII for USC, CFR, Constitution, UCC (Priority 2)
+- **`validate_citation`** - Verifies citations exist via CourtListener
+- **`web_search`** - Calls Perplexity API for general web search (Priority 3)
+- **`getToolsForOpenRouter()`** - Helper to format tools for OpenRouter function calling
+- **`executeTool()`** - Central tool execution dispatcher
+
+### Fixed (P0 Issues from GPT Review)
+- **P0.1: Cloudflare worker relevance scoring** - Added `c.id` to SELECT, built proper scoreById map
+- **P0.2: RAG worker authentication** - Added Bearer token authentication (fails closed if not configured)
+- **P0.3a: Tool parameters as JSON Schema** - Added `zodToJsonSchema()` converter
+- **P0.6: Config parsing crash** - Added NaN guard to `COUNCIL_CONCURRENCY_LIMIT` parsing
+
+### Fixed (Other)
+- **sessionId scope bug** - Added `sessionId` as class property; was undefined in `runStage1()`
+
+### Changed
+- **Stage 2 framing** - Reviewers now receive explicit critique instructions: "Your task is rigorous critique, not independent analysis"
+- **Stage 3 framing** - Chairman receives synthesis-only instructions; cannot perform independent analysis
+- **Tool descriptions emphasize hierarchy** - Project files first, then legal sources, then general web
+- **Tools fail closed** - Return error messages if API keys missing (no more mock data)
+
+### Infrastructure (Cloudflare)
+- **D1 database schema created** - `documents`, `chunks`, `api_tokens` tables
+- **Wrangler config updated** - D1 binding to `llm-legal-council` database (d72a0254-f5a9-4e88-9868-ec59eddc6491)
+- **Vectorize index config** - Ready for `legal-council-index` creation
+
+### Configuration
+New environment variables:
+- `LEGAL_KNOWLEDGE_WORKER_URL` - URL of deployed RAG worker
+- `LEGAL_KNOWLEDGE_WORKER_TOKEN` - Bearer token for RAG worker authentication
+- `COURT_LISTENER_API_KEY` - CourtListener API key for case law search
+- `PERPLEXITY_API_KEY` - Perplexity API key for web search
+
+### Deployment Notes
+To deploy the Cloudflare worker:
+1. Create Vectorize index: `npx wrangler vectorize create legal-council-index --dimensions=768 --metric=cosine`
+2. Generate API token: `openssl rand -hex 32`
+3. Set secret: `npx wrangler secret put API_TOKEN`
+4. Deploy: `npx wrangler deploy`
+
 ## [0.5.4] - 2025-01-02
 
 ### Fixed (P1 - High ROI Reliability)
