@@ -105,7 +105,10 @@ export function loadCouncilConfig(): CouncilConfig {
     fallbackChairmanModel: models[0],
     minimumSeats: 2,
     maximumSeats: 10,
-    concurrencyLimit: parseInt(process.env.COUNCIL_CONCURRENCY_LIMIT || '3', 10),
+    concurrencyLimit: (() => {
+      const raw = Number.parseInt(process.env.COUNCIL_CONCURRENCY_LIMIT ?? '3', 10);
+      return Number.isFinite(raw) && raw > 0 ? raw : 3;
+    })(),
     jsonFallbackModels,
     legalContext: {
       defaultJurisdiction: process.env.DEFAULT_JURISDICTION || 'NY'
