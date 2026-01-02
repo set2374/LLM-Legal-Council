@@ -110,24 +110,48 @@ export function loadSkills(options?: {
  * 
  * @param loadedSkills - Skills loaded by loadSkills()
  * @param stage - Which stage (affects what's included)
+ * @param skillsDir - Directory containing skills (for loading chairman-synthesis)
  */
 export function formatSkillsContext(
   loadedSkills: LoadedSkills,
-  stage: 1 | 2 | 3
+  stage: 1 | 2 | 3,
+  skillsDir?: string
 ): string {
   const sections: string[] = [];
+  const dir = skillsDir ?? DEFAULT_SKILLS_DIR;
 
   // System instruction always included
   sections.push(loadedSkills.systemInstruction);
 
-  // Skills included for Stage 1 (independent analysis)
-  // Stage 2 and 3 use lighter context
+  // Stage 1: Full analysis skills - produce best possible legal analysis
+  // Stage 2: Full analysis skills - evaluate whether Stage 1 followed methodology
+  // Stage 3: Chairman synthesis skill only - report, don't analyze
+  
   if (stage === 1 && loadedSkills.skills.length > 0) {
     sections.push('\n\n---\n\n## ATTACHED SKILLS\n');
     sections.push('Apply the following methodologies to your analysis:\n');
     
     for (const skill of loadedSkills.skills) {
       sections.push(`\n${skill.content}`);
+    }
+  } else if (stage === 2 && loadedSkills.skills.length > 0) {
+    sections.push('\n\n---\n\n## ATTACHED SKILLS\n');
+    sections.push('Use the following methodologies to evaluate whether each anonymized response properly executed the analysis protocol. Your task is rigorous critique, not independent analysis. Assess whether each analyst:\n');
+    sections.push('- Verified assertions before stating them\n');
+    sections.push('- Grounded conclusions in cited authority\n');
+    sections.push('- Tested adversarially before concluding\n');
+    sections.push('- Calibrated confidence to evidence\n');
+    sections.push('- Used proper placeholders for unverified claims\n\n');
+    
+    for (const skill of loadedSkills.skills) {
+      sections.push(`\n${skill.content}`);
+    }
+  } else if (stage === 3) {
+    // Load chairman-synthesis skill only
+    const chairmanSkillPath = path.join(dir, 'chairman-synthesis.md');
+    if (fs.existsSync(chairmanSkillPath)) {
+      sections.push('\n\n---\n\n## CHAIRMAN INSTRUCTIONS\n');
+      sections.push(fs.readFileSync(chairmanSkillPath, 'utf-8'));
     }
   }
 
