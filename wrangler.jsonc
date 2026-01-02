@@ -1,0 +1,18 @@
+{
+  "name": "llm-legal-council",
+  "compatibility_date": "2024-12-01",
+  "main": "legal-knowledge-worker/src/index.ts",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "llm-legal-council",
+      "database_id": "d72a0254-f5a9-4e88-9868-ec59eddc6491"
+    }
+  ],
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "legal-council-index"
+    }
+  ]
+}
