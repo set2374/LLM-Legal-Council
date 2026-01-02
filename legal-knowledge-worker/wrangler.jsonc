@@ -11,21 +11,24 @@
   },
 
   // D1 Database for Metadata & Content
-  // Run: npx wrangler d1 create legal-knowledge-db
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "legal-knowledge-db",
-      "database_id": "PLACEHOLDER_DB_ID"
+      "database_name": "llm-legal-council",
+      "database_id": "d72a0254-f5a9-4e88-9868-ec59eddc6491"
     }
   ],
 
   // Vectorize Index for Similarity Search
-  // Run: npx wrangler vectorize create legal-index --dimensions=768 --metric=cosine
+  // Run: npx wrangler vectorize create legal-council-index --dimensions=768 --metric=cosine
   "vectorize_indexes": [
     {
       "binding": "VECTORIZE",
-      "index_name": "legal-index"
+      "index_name": "legal-council-index"
     }
   ]
+  
+  // API_TOKEN secret for authentication
+  // Set via: npx wrangler secret put API_TOKEN
+  // Generate a secure token: openssl rand -hex 32
 }
