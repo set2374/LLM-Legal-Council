@@ -8,6 +8,7 @@ dist/
 .env
 .env.local
 .dev.vars
+CREDENTIALS.md
 
 # IDE
 .idea/
