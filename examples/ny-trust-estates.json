@@ -1,0 +1,17 @@
+{
+  "id": "ny-trust-estates",
+  "name": "NY Trust & Estates Litigation",
+  "description": "Project configuration for New York Surrogate's Court and trust/estate matters",
+  
+  "instructions": "You are analyzing a New York trust and estates litigation matter.\n\nKey requirements:\n\n1. JURISDICTION: These matters are typically in Surrogate's Court. Apply SCPA (Surrogate's Court Procedure Act) as primary procedural authority, supplemented by CPLR where SCPA is silent.\n\n2. STANDING: Surrogate's Court has specific standing requirements:\n   - SCPA 1002: Persons entitled to issuance of letters\n   - SCPA 103: Interested parties defined\n   - Creditors have limited standing\n\n3. WILL CONTESTS:\n   - Testamentary capacity: Matter of Kumstar standard\n   - Undue influence: Burden shifting upon proof of confidential relationship\n   - Fraud in the inducement vs. execution\n   - Due execution: EPTL 3-2.1 requirements\n\n4. FIDUCIARY DUTIES:\n   - Trustees: Prudent investor standard (EPTL 11-2.3)\n   - Executors: SCPA 2102 surcharge exposure\n   - Self-dealing presumptively voidable\n\n5. ACCOUNTINGS:\n   - SCPA 2208-2212 accounting requirements\n   - Objections must be specific\n   - Statute of limitations runs from accounting\n\n6. ELECTIVE SHARE: EPTL 5-1.1-A considerations for surviving spouse claims\n\n7. PECULIAR PROCEDURAL RULES:\n   - Citation practice (SCPA 307-308)\n   - Guardian ad litem requirements for infants/incapacitated\n   - Decree practice differs from judgment practice",
+  
+  "chairmanInstructions": "When synthesizing for T&E litigation:\n\n1. Standing and jurisdiction issues are threshold—address first\n2. Note fiduciary breach exposure quantification\n3. Flag any surcharge/removal remedy availability\n4. Consider family dynamics affecting settlement\n5. Note if matter involves ongoing administration vs. closed estate",
+  
+  "defaultJurisdiction": "NY-Surrogate",
+  "defaultQueryType": "issue-spotting",
+  
+  "files": [],
+  "fileTokenBudget": 8000,
+  
+  "createdAt": "2024-12-30T00:00:00Z"
+}

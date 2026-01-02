@@ -1,0 +1,52 @@
+{
+  "name": "llm-legal-council",
+  "version": "0.5.4",
+  "description": "Multi-model LLM deliberation system for legal analysis, critique, and risk assessment",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "legal-council": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "system-instruction.md",
+    "examples"
+  ],
+  "scripts": {
+    "dev": "tsx watch src/cli.ts",
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "cli": "tsx src/cli.ts",
+    "cli:interactive": "tsx src/cli.ts --interactive",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "llm",
+    "legal",
+    "ai",
+    "multi-agent",
+    "deliberation",
+    "council"
+  ],
+  "author": "set2374",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

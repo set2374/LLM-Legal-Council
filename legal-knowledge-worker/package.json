@@ -1,0 +1,17 @@
+{
+  "name": "legal-knowledge-worker",
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "wrangler dev src/index.ts",
+    "deploy": "wrangler deploy --minify src/index.ts",
+    "db:init": "wrangler d1 execute legal-knowledge-db --file=./schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240208.0",
+    "wrangler": "^3.28.1",
+    "typescript": "^5.3.3"
+  }
+}

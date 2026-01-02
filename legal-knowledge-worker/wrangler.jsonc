@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "legal-knowledge-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  
+  // AI Binding for Embeddings
+  "ai": {
+    "binding": "AI"
+  },
+
+  // D1 Database for Metadata & Content
+  // Run: npx wrangler d1 create legal-knowledge-db
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "legal-knowledge-db",
+      "database_id": "PLACEHOLDER_DB_ID"
+    }
+  ],
+
+  // Vectorize Index for Similarity Search
+  // Run: npx wrangler vectorize create legal-index --dimensions=768 --metric=cosine
+  "vectorize_indexes": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "legal-index"
+    }
+  ]
+}
