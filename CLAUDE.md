@@ -323,6 +323,167 @@ npx wrangler deploy
 
 Current version: **0.6.0** (see CHANGELOG.md for release notes)
 
+---
+
+## v0.8 Development Roadmap
+
+This section documents planned improvements for the GUI version (v0.7-v0.8).
+
+### Planned Architecture Changes
+
+**Target Stack:**
+- **Backend:** Node.js + Hono server (NOT Cloudflare Workers - deliberation exceeds 30-second limit)
+- **Frontend:** React
+- **Model Routing:** OpenRouter API
+- **Storage:** Cloudflare D1 (SQLite) + R2 (file storage)
+- **RAG:** Gemini File Search for document Q&A
+
+**Model Configuration:**
+| Seat | Model | Role |
+|------|-------|------|
+| A | Claude Sonnet 4.5 | Lead Analyst |
+| B | GPT-5.2 | Red Team |
+| C | Gemini 3 Pro | Judge |
+| D (optional) | Grok 4.1 | Contrarian |
+
+**Note:** GPT-4o is explicitly excluded.
+
+### Priority 1: Bug Fixes
+
+#### 1.1 RAG Worker Embedding Batching
+**Problem:** Worker calls `env.AI.run()` for each text chunk individually, exceeding Cloudflare's subrequest limits.
+
+**Fix:** Batch operations:
+- Embeddings: `EMBEDDING_BATCH_SIZE = 100`
+- Vectorize: `VECTORIZE_BATCH_SIZE = 100`
+- D1: `D1_BATCH_SIZE = 100`
+
+### Priority 2: GUI Improvements
+
+#### Layout Redesign
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ☰  LLM Legal Council                                                  📎  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│   ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐ ┌──────────┐ │
+│   │   GROK 4.1      │ │   GEMINI 3      │ │   GPT 5.2       │ │  CLAUDE  │ │
+│   │   (brand color) │ │   (brand color) │ │   (brand color) │ │  (amber) │ │
+│   │   [streaming]   │ │   [streaming]   │ │   [streaming]   │ │[streaming│ │
+│   └─────────────────┘ └─────────────────┘ └─────────────────┘ └──────────┘ │
+│   [Critiques ▼]  [Synthesis ▼]                                             │
+│   ┌─────────────────────────────────────────────────────────────────────┐  │
+│   │ 📎  Ask the council...                                          ➤  │  │
+│   └─────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key changes:**
+- Remove dedicated upload panel → paperclip icon + drag-and-drop
+- ☰ (left) → History sidebar slides in
+- 📎 (right) → Documents sidebar slides in
+
+#### Brand Colors
+| Model | Brand Color | Gradient |
+|-------|-------------|----------|
+| Claude | `#D97706` (amber) | `linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)` |
+| GPT | `#10A37F` (green) | `linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%)` |
+| Gemini | `#4285F4` (blue) | `linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%)` |
+
+### Priority 3: Post-Deliberation Chat
+
+Enable back-and-forth conversation with all four models after deliberation.
+
+**Architecture (Broadcast):**
+1. User sends message
+2. All 4 models receive in parallel with full context
+3. All 4 respond (streamed)
+4. User sees 4 responses, can follow up
+
+**Context per model:** `system prompt + original query + documents + its Stage 1 response + relevant critiques + synthesis + chat history + new question`
+
+### Priority 4: Conversation Persistence
+
+**New D1 Tables:**
+```sql
+CREATE TABLE deliberations (
+  id TEXT PRIMARY KEY,
+  query TEXT NOT NULL,
+  documents TEXT,
+  synthesis TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE deliberation_responses (
+  id TEXT PRIMARY KEY,
+  deliberation_id TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  is_chairman BOOLEAN DEFAULT FALSE
+);
+
+CREATE TABLE chat_messages (
+  id TEXT PRIMARY KEY,
+  deliberation_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL
+);
+```
+
+### Priority 5: Project System Enhancement
+
+**Per-Seat Customization:**
+- `system_prompt_prefix/suffix`
+- `persona` - Role description
+- `temperature` - Model-specific setting
+
+**New D1 Tables:**
+```sql
+CREATE TABLE projects (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  jurisdiction TEXT DEFAULT 'NY',
+  system_prompt TEXT,
+  default_mode TEXT DEFAULT 'parallel'
+);
+
+CREATE TABLE seats (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL,
+  seat_number INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  role TEXT NOT NULL,
+  persona TEXT,
+  temperature REAL DEFAULT 0.7
+);
+```
+
+### Planned Tool Stack (6 tools)
+
+| Tool | Function |
+|------|----------|
+| `web_search` | Perplexity API |
+| `courtlistener_search` | Case law research |
+| `cornell_lii_search` | Statutes/CFR |
+| `gemini_file_search` | Document Q&A with grounding |
+| `extract_file_content` | PDF/DOCX text extraction |
+| `project_knowledge_search` | Local skills/reference files |
+
+### Development Phases
+
+1. **Phase 1: Stabilization** - Fix batching, test tool iteration
+2. **Phase 2: Chat Feature** - WebSocket/SSE chat, parallel model calls
+3. **Phase 3: Persistence** - D1 tables, history sidebar
+4. **Phase 4: GUI Polish** - New layout, brand colors, streaming
+5. **Phase 5: Projects** - Project CRUD, per-seat customization
+
+### Known Constraints
+
+1. **Cloudflare Workers 30-second limit** - Use Node.js server for full deliberation
+2. **Token budget** - Long conversations may need summarization
+3. **OpenRouter latency** - ~50-100ms overhead per call
+
+---
+
 ## Important Notes for AI Assistants
 
 1. **Never draft documents** - This system is for critique/deliberation only
@@ -331,3 +492,4 @@ Current version: **0.6.0** (see CHANGELOG.md for release notes)
 4. **Skills are methodology** - They teach HOW to analyze, not WHAT the law is
 5. **Board Seat architecture** - No hardcoded model defaults; all configuration via env vars
 6. **Minimum quorum is 2** - At least 2 council models must respond for valid deliberation
+7. **GPT-4o excluded** - Do not use GPT-4o in model configurations
