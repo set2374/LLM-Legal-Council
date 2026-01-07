@@ -109,3 +109,23 @@ export {
   selectChairman,
   ChairmanSelectionResult
 } from './council/audit.js';
+
+// Model Selector
+export {
+  ModelSelector,
+  createModelSelector,
+  getOpenRouterModels,
+  getCuratedModels,
+  clearModelCache,
+  CURATED_MODEL_ANALYSIS,
+  getRecommendedCouncilConfig
+} from './models/index.js';
+
+export type {
+  OpenRouterModel,
+  ModelPricing,
+  ModelCapabilities,
+  CouncilAnalysis,
+  CouncilConfiguration,
+  ModelSelectorOptions
+} from './models/index.js';

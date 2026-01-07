@@ -484,6 +484,156 @@ CREATE TABLE seats (
 
 ---
 
+## Model Selector
+
+The system includes a comprehensive model selector that fetches the latest models from OpenRouter on app startup.
+
+### CLI Commands
+
+```bash
+# List all models (compact view, recommended only)
+npm run models:list
+
+# Show recommended council configuration
+npm run models:recommend
+
+# Interactive configuration wizard
+npm run models:configure
+
+# Validate current .env configuration
+npm run models:validate
+
+# Full model selector CLI
+npx tsx src/model-selector-cli.ts list --verbose
+npx tsx src/model-selector-cli.ts info anthropic/claude-sonnet-4
+```
+
+### Model Analysis
+
+Each model includes council-specific analysis:
+- **Council Score (1-10)** - Overall suitability for legal deliberation
+- **Strengths/Weaknesses** - For legal reasoning tasks
+- **Recommended Role** - lead-analyst, red-team, judge, contrarian, chairman
+- **Chairman Suitability** - Whether suitable for synthesis role
+
+### Recommended Configuration
+
+| Seat | Model | Role | Score |
+|------|-------|------|-------|
+| A | Claude Sonnet 4 | Lead Analyst | 9/10 |
+| B | GPT-5.2 | Red Team | 8/10 |
+| C | Gemini 3 Pro | Judge | 8/10 |
+| D | Grok 4.1 | Contrarian | 8/10 |
+| Chairman | Claude Sonnet 4 | Synthesis | 9/10 |
+
+---
+
+## Web & iOS App Roadmap (v1.0+)
+
+### Target Platforms
+
+| Platform | Technology | Status |
+|----------|------------|--------|
+| Web App | React + Hono (SSE) | Planned |
+| iOS App | React Native or Swift UI | Planned |
+| Desktop | Electron wrapper (current) | Active |
+
+### Web App Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         FRONTEND                                │
+│  React SPA (Vite) - Hosted on Cloudflare Pages                 │
+├─────────────────────────────────────────────────────────────────┤
+│                         BACKEND                                 │
+│  Node.js + Hono - Hosted on VPS/Railway/Fly.io                 │
+│  (NOT Cloudflare Workers - deliberation > 30s)                 │
+├─────────────────────────────────────────────────────────────────┤
+│                         STORAGE                                 │
+│  Cloudflare D1 (SQLite) + R2 (files)                           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Features:**
+- SSE streaming for real-time model responses
+- WebSocket for post-deliberation chat
+- Authentication via Clerk or Auth.js
+- PWA support for mobile web
+
+### iOS App Requirements
+
+**Display Modes:**
+- Portrait mode: Stacked model cards (scrollable)
+- Landscape mode: Side-by-side model cards (Hollywood Squares)
+- Auto-rotation enabled
+
+**Responsive Layouts:**
+
+```
+PORTRAIT (iPhone)                    LANDSCAPE (iPad/iPhone)
+┌─────────────────┐                  ┌─────────┬─────────┐
+│     CLAUDE      │                  │ CLAUDE  │  GPT    │
+│   [streaming]   │                  │         │         │
+├─────────────────┤                  ├─────────┼─────────┤
+│      GPT        │                  │ GEMINI  │  GROK   │
+│   [streaming]   │                  │         │         │
+├─────────────────┤                  └─────────┴─────────┘
+│     GEMINI      │                  ┌─────────────────────┐
+│   [streaming]   │                  │  Ask the council... │
+├─────────────────┤                  └─────────────────────┘
+│      GROK       │
+│   [streaming]   │
+├─────────────────┤
+│ Ask the council │
+└─────────────────┘
+```
+
+**Technical Approach Options:**
+
+1. **React Native + Expo** (Recommended)
+   - Shared codebase with web
+   - Expo SDK for native features
+   - OTA updates without App Store review
+
+2. **Swift UI (Native)**
+   - Best iOS performance
+   - Separate codebase
+   - Full iOS feature access
+
+3. **Capacitor (Web wrapper)**
+   - Reuse React web code
+   - PWA-first approach
+   - Limited native features
+
+### Development Phases (Updated)
+
+1. **Phase 1: Web Foundation** (Current)
+   - Complete model selector ✓
+   - Fix RAG worker batching
+   - Stabilize deliberation flow
+
+2. **Phase 2: Web App MVP**
+   - Hono server with SSE
+   - React frontend with streaming
+   - Basic authentication
+
+3. **Phase 3: Web Features**
+   - Post-deliberation chat
+   - History persistence (D1)
+   - Project management
+
+4. **Phase 4: iOS App**
+   - React Native setup
+   - Responsive layouts (portrait/landscape)
+   - Native file handling
+
+5. **Phase 5: Polish**
+   - Brand colors and theming
+   - Animations and transitions
+   - Performance optimization
+
+---
+
 ## Important Notes for AI Assistants
 
 1. **Never draft documents** - This system is for critique/deliberation only
