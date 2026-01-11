@@ -19,6 +19,7 @@ import chalk from 'chalk';
 import { program } from 'commander';
 import * as readline from 'readline';
 import * as fs from 'fs';
+import * as path from 'path';
 
 import { LegalCouncilOrchestrator, CouncilQuorumError, ProgressEvent } from './council/orchestrator.js';
 import { createOpenRouterClient } from './council/openrouter.js';
@@ -26,6 +27,14 @@ import { loadCouncilConfig, validateConfig, ConfigurationError, councilUseCases,
 import { CouncilQuery, CouncilQueryType, CouncilDeliberation } from './types.js';
 import { loadProject, createProjectTemplate, saveProject, ProjectError, LoadedProject } from './project.js';
 import { formatUsageSummary, UsageSummary } from './usage.js';
+import {
+  createNotebookLMClient,
+  validateNotebookLMConfig,
+  deliberationToPodcastRequest,
+  NotebookLMError,
+  NotebookLMAuthError,
+  PodcastOperationState,
+} from './notebooklm/index.js';
 
 /**
  * Validate configuration and show helpful errors
@@ -364,22 +373,174 @@ async function runInteractive(project?: LoadedProject): Promise<void> {
 async function createProject(name: string, jurisdiction?: string): Promise<void> {
   const template = createProjectTemplate(name, jurisdiction);
   const filename = `${template.id}.json`;
-  
+
   if (fs.existsSync(filename)) {
     console.log(chalk.red(`Error: File already exists: ${filename}`));
     process.exit(1);
   }
-  
+
   saveProject(template, filename);
   console.log(chalk.green(`Created project file: ${filename}`));
   console.log(chalk.dim('Edit this file to customize your project instructions and add files.'));
+}
+
+// ============================================================================
+// Podcast Generation
+// ============================================================================
+
+/**
+ * Display podcast generation progress
+ */
+function createPodcastProgressHandler(): (state: PodcastOperationState, progress?: number) => void {
+  return (state: PodcastOperationState, progress?: number) => {
+    const progressStr = progress !== undefined ? ` (${progress}%)` : '';
+    switch (state) {
+      case 'PENDING':
+        process.stdout.write(chalk.dim(`  ◦ Queued for generation${progressStr}\r`));
+        break;
+      case 'RUNNING':
+        process.stdout.write(chalk.blue(`  ▶ Generating podcast${progressStr}\r`));
+        break;
+      case 'SUCCEEDED':
+        console.log(chalk.green(`  ✓ Generation complete${progressStr}`));
+        break;
+      case 'FAILED':
+        console.log(chalk.red(`  ✗ Generation failed`));
+        break;
+      case 'CANCELLED':
+        console.log(chalk.yellow(`  ⚠ Generation cancelled`));
+        break;
+      default:
+        process.stdout.write(chalk.dim(`  ◦ ${state}${progressStr}\r`));
+    }
+  };
+}
+
+/**
+ * Generate a podcast from a deliberation
+ */
+async function generatePodcast(
+  deliberation: CouncilDeliberation,
+  options: {
+    output?: string;
+    title?: string;
+    length?: 'SHORT' | 'STANDARD';
+    language?: string;
+    focus?: string;
+  } = {}
+): Promise<void> {
+  // Validate NotebookLM configuration
+  const validation = validateNotebookLMConfig();
+
+  if (validation.warnings.length > 0) {
+    for (const warning of validation.warnings) {
+      console.log(chalk.yellow(`⚠ ${warning}`));
+    }
+  }
+
+  if (!validation.valid) {
+    console.log(chalk.red('\nNotebookLM Configuration Error:'));
+    for (const error of validation.errors) {
+      console.log(chalk.red(`  • ${error}`));
+    }
+    console.log();
+    console.log(chalk.dim('Required environment variables:'));
+    console.log(chalk.dim('  GOOGLE_CLOUD_PROJECT_ID=your_project_id'));
+    console.log(chalk.dim(''));
+    console.log(chalk.dim('Authentication (one of):'));
+    console.log(chalk.dim('  GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json'));
+    console.log(chalk.dim('  NOTEBOOKLM_ACCESS_TOKEN=your_access_token'));
+    console.log(chalk.dim('  Or: gcloud auth login && gcloud auth application-default login'));
+    process.exit(1);
+  }
+
+  logSection('PODCAST GENERATION');
+  console.log(chalk.cyan('Initializing NotebookLM client...'));
+
+  try {
+    const client = createNotebookLMClient();
+
+    // Convert deliberation to podcast request
+    const request = deliberationToPodcastRequest(deliberation, {
+      title: options.title,
+      length: options.length || 'STANDARD',
+      languageCode: options.language || 'en-US',
+      focus: options.focus,
+      includeDissent: true,
+      includeActionItems: true,
+      includeRiskDetails: true,
+    });
+
+    console.log(chalk.dim(`Title: ${request.title}`));
+    console.log(chalk.dim(`Length: ${request.podcastConfig.length}`));
+    console.log(chalk.dim(`Language: ${request.podcastConfig.languageCode}`));
+
+    // Determine output path
+    const outputPath = options.output || `podcast-${deliberation.sessionId}.mp3`;
+    console.log(chalk.dim(`Output: ${outputPath}`));
+    console.log();
+
+    console.log(chalk.blue('▶ Starting podcast generation...'));
+    console.log(chalk.dim('  This may take several minutes.'));
+    console.log();
+
+    const result = await client.generateAndDownload(request, {
+      outputPath,
+      onProgress: createPodcastProgressHandler(),
+    });
+
+    if (result.success) {
+      console.log();
+      logSection('PODCAST GENERATED');
+      console.log(chalk.green(`✓ Audio saved to: ${result.audioFilePath}`));
+      if (result.durationSeconds) {
+        const minutes = Math.floor(result.durationSeconds / 60);
+        const seconds = Math.round(result.durationSeconds % 60);
+        console.log(chalk.dim(`  Duration: ${minutes}:${seconds.toString().padStart(2, '0')}`));
+      }
+      console.log();
+      console.log(chalk.dim('You can play this file with any audio player or share it with your team.'));
+    } else {
+      console.log(chalk.red(`\n✗ Podcast generation failed: ${result.error}`));
+      process.exit(1);
+    }
+  } catch (error) {
+    if (error instanceof NotebookLMAuthError) {
+      console.log(chalk.red(`\nAuthentication Error: ${error.message}`));
+      console.log(chalk.dim('Ensure your Google Cloud credentials are properly configured.'));
+    } else if (error instanceof NotebookLMError) {
+      console.log(chalk.red(`\nNotebookLM Error: ${error.message}`));
+    } else {
+      console.log(chalk.red(`\nError: ${error instanceof Error ? error.message : 'Unknown error'}`));
+    }
+    process.exit(1);
+  }
+}
+
+/**
+ * Load a deliberation from a JSON file
+ */
+function loadDeliberation(filePath: string): CouncilDeliberation {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`File not found: ${filePath}`);
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8');
+  const data = JSON.parse(content);
+
+  // Basic validation
+  if (!data.sessionId || !data.query || !data.consensus) {
+    throw new Error('Invalid deliberation file: missing required fields');
+  }
+
+  return data as CouncilDeliberation;
 }
 
 // CLI setup with commander
 program
   .name('legal-council')
   .description('Multi-model LLM deliberation system for legal analysis')
-  .version('0.5.4')
+  .version('0.6.0')
   .argument('[query...]', 'Legal question to deliberate on')
   .option('-f, --file <path>', 'Read question from file')
   .option('-i, --interactive', 'Interactive mode')
@@ -388,13 +549,14 @@ program
   .option('--no-progress', 'Disable progress output')
   .option('--create-project <name>', 'Create a new project template')
   .option('--jurisdiction <jx>', 'Set jurisdiction for new project (use with --create-project)')
+  .option('--save-result <path>', 'Save deliberation result to JSON file')
   .action(async (queryParts: string[], options) => {
     // Handle project creation
     if (options.createProject) {
       await createProject(options.createProject, options.jurisdiction);
       return;
     }
-    
+
     // Load project if specified
     let project: LoadedProject | undefined;
     if (options.project) {
@@ -422,10 +584,10 @@ program
         process.exit(1);
       }
       const query = fs.readFileSync(options.file, 'utf-8').trim();
-      await runDeliberation(query, { 
+      await runDeliberation(query, {
         queryType: options.type as CouncilQueryType,
         project,
-        showProgress: options.progress
+        showProgress: options.progress,
       });
       return;
     }
@@ -436,11 +598,81 @@ program
     }
 
     const query = queryParts.join(' ');
-    await runDeliberation(query, { 
+    await runDeliberation(query, {
       queryType: options.type as CouncilQueryType,
       project,
-      showProgress: options.progress
+      showProgress: options.progress,
     });
+  });
+
+// Podcast subcommand
+program
+  .command('podcast <deliberation-file>')
+  .description('Generate an AI podcast from a saved deliberation JSON file')
+  .option('-o, --output <path>', 'Output MP3 file path')
+  .option('-t, --title <title>', 'Podcast title')
+  .option('-l, --length <length>', 'Podcast length: SHORT (4-5 min) or STANDARD (~10 min)', 'STANDARD')
+  .option('--language <code>', 'Language code (e.g., en-US, es, fr)', 'en-US')
+  .option('--focus <prompt>', 'Focus prompt for podcast content')
+  .action(async (deliberationFile: string, options) => {
+    try {
+      console.log(chalk.cyan(`Loading deliberation from: ${deliberationFile}`));
+      const deliberation = loadDeliberation(deliberationFile);
+      console.log(chalk.dim(`Session ID: ${deliberation.sessionId}`));
+      console.log(chalk.dim(`Query: "${deliberation.query.substring(0, 60)}..."`));
+
+      await generatePodcast(deliberation, {
+        output: options.output,
+        title: options.title,
+        length: options.length?.toUpperCase() as 'SHORT' | 'STANDARD',
+        language: options.language,
+        focus: options.focus,
+      });
+    } catch (error) {
+      console.log(chalk.red(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      process.exit(1);
+    }
+  });
+
+// Podcast config validation subcommand
+program
+  .command('podcast-config')
+  .description('Validate NotebookLM/Google Cloud configuration')
+  .action(() => {
+    logSection('NOTEBOOKLM CONFIGURATION CHECK');
+
+    const validation = validateNotebookLMConfig();
+
+    console.log();
+    if (validation.valid) {
+      console.log(chalk.green('✓ Configuration is valid'));
+    } else {
+      console.log(chalk.red('✗ Configuration has errors:'));
+      for (const error of validation.errors) {
+        console.log(chalk.red(`  • ${error}`));
+      }
+    }
+
+    if (validation.warnings.length > 0) {
+      console.log();
+      console.log(chalk.yellow('Warnings:'));
+      for (const warning of validation.warnings) {
+        console.log(chalk.yellow(`  ⚠ ${warning}`));
+      }
+    }
+
+    console.log();
+    console.log(chalk.bold('Current Configuration:'));
+    console.log(chalk.dim(`  GOOGLE_CLOUD_PROJECT_ID: ${process.env.GOOGLE_CLOUD_PROJECT_ID || '(not set)'}`));
+    console.log(chalk.dim(`  GOOGLE_APPLICATION_CREDENTIALS: ${process.env.GOOGLE_APPLICATION_CREDENTIALS || '(not set)'}`));
+    console.log(chalk.dim(`  NOTEBOOKLM_ACCESS_TOKEN: ${process.env.NOTEBOOKLM_ACCESS_TOKEN ? '(set)' : '(not set)'}`));
+    console.log(chalk.dim(`  NOTEBOOKLM_REGION: ${process.env.NOTEBOOKLM_REGION || 'global (default)'}`));
+    console.log(chalk.dim(`  NOTEBOOKLM_DEFAULT_LENGTH: ${process.env.NOTEBOOKLM_DEFAULT_LENGTH || 'STANDARD (default)'}`));
+    console.log(chalk.dim(`  NOTEBOOKLM_DEFAULT_LANGUAGE: ${process.env.NOTEBOOKLM_DEFAULT_LANGUAGE || 'en-US (default)'}`));
+
+    if (!validation.valid) {
+      process.exit(1);
+    }
   });
 
 program.parse();

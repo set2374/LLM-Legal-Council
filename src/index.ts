@@ -109,3 +109,29 @@ export {
   selectChairman,
   ChairmanSelectionResult
 } from './council/audit.js';
+
+// NotebookLM Integration
+export {
+  NotebookLMClient,
+  createNotebookLMClient,
+  validateNotebookLMConfig,
+  deliberationToPodcastRequest,
+  formatDeliberationContent,
+  estimateTokenCount,
+  willFitInTokenLimit,
+  NotebookLMError,
+  NotebookLMAuthError,
+  NotebookLMContentTooLargeError,
+} from './notebooklm/index.js';
+
+export type {
+  PodcastConfig,
+  PodcastContext,
+  GeneratePodcastRequest,
+  PodcastOperation,
+  PodcastOperationState,
+  PodcastResource,
+  NotebookLMConfig,
+  DeliberationToPodcastOptions,
+  PodcastGenerationResult,
+} from './notebooklm/index.js';
